@@ -10,6 +10,7 @@ use imageproc::drawing::draw_filled_rect_mut;
 use imageproc::rect::Rect;
 use tract_onnx::prelude::*;
 use tract_onnx::prelude::tract_itertools::Itertools;
+use tract_onnx::prelude::tract_num_traits::abs;
 
 use crate::benchmark::Timer;
 use crate::dot2rect::{Point, wrapped_rect};
@@ -106,6 +107,7 @@ fn main() -> TractResult<()> {
     }
     output_image.save("render.png").expect("Failed to save output image");
     timer.tick();
+    println!("\n");
     timer.all();
     Ok(())
 }
@@ -135,6 +137,8 @@ fn rec<F, O, M>(model: &RunnableModel<F, O, M>, image: &RgbImage, label: &Vec<&s
     let iter = binding.iter()
         .cloned();
     let mut rec = "".to_string();
+    let mut last_text = String::new();
+    let mut last_probability = 0f32;
     for chunk in &iter.chunks(6625) {
         let best = chunk
             .collect::<Vec<_>>();
@@ -145,8 +149,19 @@ fn rec<F, O, M>(model: &RunnableModel<F, O, M>, image: &RgbImage, label: &Vec<&s
                 value = *v;
             }
         }
-        let text = if id > 0 && id <= label.len() { label[id - 1] } else { "" };
-        rec += text;
+        let text = if id > 0 && id <= label.len() { format!("{}", label[id - 1]) } else { "".to_string() };
+        if text != "" {
+            let min = if value < last_probability { value } else { last_probability };
+            let repeat_not_remove = text == last_text && abs((value - last_probability) / min) < 0.07 && value > 0.6 && last_probability > 0.6;
+            // if repeat_not_remove {
+            //     print!("({})({},{}->{})", text, last_probability, value, abs(value - last_probability) / min)
+            // }
+            if text != last_text || repeat_not_remove || last_probability == 0f32 {
+                rec += text.as_str();
+            }
+            last_text = text;
+            last_probability = value;
+        }
     }
     println!("\t{:?}", rec);
     Ok(rec)

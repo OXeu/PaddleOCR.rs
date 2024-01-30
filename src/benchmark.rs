@@ -16,13 +16,13 @@ impl Timer {
     pub fn tick(&mut self) {
         let now = Local::now().timestamp_millis();
         let diff = now - self.time;
-        print!("[+] Spent: {diff} ms\t");
+        print!("[+] Spent: \t{diff} ms\t");
         self.time = now;
     }
 
     pub fn all(&self) {
         let now = Local::now().timestamp_millis();
         let diff = now - self.start;
-        println!("[+] All Task Spent: {diff} ms");
+        println!("[+] All Task Spent: \t{diff} ms");
     }
 }
