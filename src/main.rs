@@ -201,9 +201,10 @@ fn rec<F, O, M>(model: &RunnableModel<F, O, M>, image: &RgbImage, label: &Vec<St
         if text != "" {
             let min = if value < last_probability { value } else { last_probability };
             let repeat_not_remove = text == last_text && abs((value - last_probability) / min) < 0.07 && value > 0.6 && last_probability > 0.6;
-            // if repeat_not_remove {
-            //     print!("({})({},{}->{})", text, last_probability, value, abs(value - last_probability) / min)
-            // }
+            #[cfg(feature = "dbg")]
+            if repeat_not_remove {
+                print!("({})({},{}->{})", text, last_probability, value, abs(value - last_probability) / min)
+            }
             if text != last_text || repeat_not_remove || last_probability == 0f32 {
                 rec += text.as_str();
             }
