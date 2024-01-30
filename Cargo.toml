@@ -8,11 +8,11 @@ edition = "2021"
 [dependencies]
 image = "0"
 imageproc = "0"
-plt = { version = "0.4.1",features = ["png"] }
+plt = { version = "0",features = ["png"] }
 tract-onnx = "0"
-rand = "0.8.5"
+chrono = "0"
 
 [profile.release]
-opt-level = 'z'
-lto = true
-codegen-units = 1
+#opt-level = 'z'
+#lto = true
+#codegen-units = 1

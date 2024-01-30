@@ -30,7 +30,7 @@ impl Rect {
 }
 
 fn is_valid_point(point: Point, width: u32, height: u32) -> bool {
-    point.x >= 0 && point.x < width && point.y >= 0 && point.y < height
+    point.x < width && point.y < height
 }
 
 fn get_neighbors(point: Point, step: i32) -> Vec<Point> {
