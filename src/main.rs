@@ -14,8 +14,8 @@ use crate::dot2rect::{Point, wrapped_rect};
 
 mod dot2rect;
 
-const WIDTH: u32 = 960;
-const HEIGHT: u32 = 960;
+const WIDTH: u32 = 256;
+const HEIGHT: u32 = 256;
 
 fn main() -> TractResult<()> {
     let image_path = "example/test.jpeg";
