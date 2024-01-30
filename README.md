@@ -1,5 +1,8 @@
 # PaddleOCR.rs
+
 PaddleOCR's Rust inference framework
 
 ## Features
-- no dependencies on OpenCV
+
+- Not depend on OpenCV
+- Small binary size(Only 8.3MB on Linux)
