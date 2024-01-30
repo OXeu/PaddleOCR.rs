@@ -8,7 +8,7 @@ pub struct Point {
     pub(crate) y: u32,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -18,14 +18,15 @@ pub struct Rect {
 
 impl Rect {
     pub fn remap(&mut self, width: u32, height: u32) {
+        assert_ne!(width, 0);
+        assert_ne!(height, 0);
         let w_scale = width as f64 / WIDTH as f64;
         let h_scale = height as f64 / HEIGHT as f64;
         self.x = (self.x as f64 * w_scale) as u32;
         self.y = (self.y as f64 * h_scale) as u32;
-        self.y = height - self.y;
+        // self.y = height - self.y;
         self.width = (self.width as f64 * w_scale) as u32;
         self.height = (self.height as f64 * h_scale) as u32;
-        self.y -= self.height
     }
 }
 
@@ -139,4 +140,14 @@ fn test() {
     for component in connected_components {
         println!("{:?}", component);
     }
+}
+
+
+#[test]
+fn num_test() {
+    let height = 4444u32;
+    let small_height: u32 = 224;
+    let h_scale = height as f64 / small_height as f64;
+    let y = (5u32 as f64 * h_scale) as u32;
+    println!("{y}")
 }
