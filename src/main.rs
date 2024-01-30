@@ -2,15 +2,17 @@ use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
 use std::fs;
 use std::fs::File;
-use std::io::{BufWriter, Read};
+#[cfg(feature = "dbg")]
+use std::io::BufWriter;
+use std::io::Read;
 use std::string::String;
 #[cfg(feature = "dbg")]
 use std::sync::RwLock;
 
 #[cfg(feature = "dbg")]
-use image::{GenericImage, ImageBuffer, Rgb};
-use image::{ImageOutputFormat, RgbImage};
+use image::{GenericImage, ImageBuffer, ImageOutputFormat, Rgb};
 use image::io::Reader as ImageReader;
+use image::RgbImage;
 #[cfg(feature = "dbg")]
 use imageproc::drawing::draw_filled_rect_mut;
 use tract_onnx::prelude::*;
@@ -29,7 +31,7 @@ const HEIGHT: u32 = 256;
 #[tokio::main]
 async fn main() -> TractResult<()> {
     let mut timer = Timer::new();
-    let image_path = "example/40a4bae6f5a3ef025778196b2d0cc708.jpeg";
+    let image_path = "example/test.jpeg";
     let rec_model = onnx()
         // load the model
         .model_for_path("model/rec.onnx")?
@@ -46,12 +48,12 @@ async fn main() -> TractResult<()> {
         .into_runnable()?;
     let rec_model = Arc::new(rec_model);
     timer.tick();
-    println!("model load successfully");
+    println!("Model loaded");
 
     let _ = fs::remove_dir_all("output");
     let _ = fs::create_dir("output");
     timer.tick();
-    println!("Cleaned output folder!");
+    println!("Cleaned output folder");
 
     let mut buf = String::new();
     File::open("model/label_list.txt").unwrap().read_to_string(&mut buf).expect("Unable to read label");
@@ -127,13 +129,13 @@ async fn main() -> TractResult<()> {
         let handler = tokio::spawn(async move {
             if let Some(mut rect) = wrapped_rect(component) {
                 rect.remap(width, height);
+                let sub_image = image::imageops::crop_imm(image_cloned.as_ref(), rect.x, rect.y, rect.width, rect.height).to_image();
                 #[cfg(feature = "dbg")]{
                     let mut rect_mut = rect_clone.write().unwrap();
                     rect_mut.push(rect.clone());
+                    let mut buf = BufWriter::new(File::create(format!("output/{}-{}.png", rect.x, rect.y)).unwrap());
+                    sub_image.write_to(&mut buf, ImageOutputFormat::Png).expect("TODO: panic message");
                 }
-                let sub_image = image::imageops::crop_imm(image_cloned.as_ref(), rect.x, rect.y, rect.width, rect.height).to_image();
-                let mut buf = BufWriter::new(File::create(format!("output/{}-{}.png", rect.x, rect.y)).unwrap());
-                sub_image.write_to(&mut buf, ImageOutputFormat::Png).expect("TODO: panic message");
                 rec(&rec_model_cloned, &sub_image, &label_cloned).unwrap();
             }
         });
@@ -212,6 +214,7 @@ fn rec<F, O, M>(model: &RunnableModel<F, O, M>, image: &RgbImage, label: &Vec<St
             last_probability = value;
         }
     }
+    #[cfg(feature = "dbg")]
     println!("\t{:?}", rec);
     Ok(rec)
 }
