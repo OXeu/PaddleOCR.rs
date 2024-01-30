@@ -30,13 +30,16 @@ const MAX_H_PARTS: u32 = 3;
 // Actual parts: MAX_H_PARTS * MAX_V_PARTS
 const MAX_V_PARTS: u32 = MAX_H_PARTS;
 
-const PADDING_X: u32 = 4;
+const PADDING_X: u32 = 8;
 const PADDING_Y: u32 = PADDING_X;
+const NEIGHBOR_STEP: i32 = 1;
+const DETECT_AREA_EXPAND_PADDING_X: u32 = 3;
+const DETECT_AREA_EXPAND_PADDING_Y: u32 = 1;
 
 #[tokio::main]
 async fn main() -> TractResult<()> {
     let mut timer = Timer::new();
-    let image_path = "example/test2.jpeg";
+    let image_path = "example/test.jpeg";
     let rec_model = onnx()
         // load the model
         .model_for_path("model/rec.onnx")?
@@ -75,9 +78,7 @@ async fn main() -> TractResult<()> {
     let (width, height) = (image.width(), image.height());
     let real_padding_x = PADDING_X as f32 / WIDTH as f32 * width as f32;
     let real_padding_y = PADDING_Y as f32 / HEIGHT as f32 * height as f32;
-    println!("{real_padding_x},{real_padding_y}");
     let (w_parts, h_parts) = (cmp::min(MAX_H_PARTS, (width + WIDTH - 1) / WIDTH), cmp::min(MAX_V_PARTS, (height + HEIGHT - 1) / HEIGHT));
-    println!("Image Info: ({width}/{height}) crop {w_parts}/{h_parts}");
     let points: Arc<RwLock<Vec<(u32, u32)>>> = Arc::new(RwLock::new(Vec::new()));
     let mut handlers = vec![];
     for w_part_i in 0..w_parts {
@@ -88,13 +89,19 @@ async fn main() -> TractResult<()> {
             let handler = tokio::spawn(async move {
                 let w = width as f32 / w_parts as f32;
                 let h = height as f32 / h_parts as f32;
-                let (w_pad, h_pad) = (w + 2f32 * real_padding_x, h + 2f32 * real_padding_y);
+                let (mut w_pad,mut h_pad) = (w + 2f32 * real_padding_x, h + 2f32 * real_padding_y);
                 let x = w_part_i as f32 * w;
                 let y = h_part_i as f32 * h;
                 let left_pad = if x < real_padding_x { 0f32 } else { real_padding_x };
                 let top_pad = if y < real_padding_y { 0f32 } else { real_padding_y };
                 let x_pad = (x - real_padding_x).max(0f32);
                 let y_pad = (y - real_padding_y).max(0f32);
+                if x_pad + w_pad > width as f32 {
+                    w_pad = width as f32 - x_pad;
+                }
+                if y_pad + h_pad > height as f32 {
+                    h_pad = height as f32 - y_pad;
+                }
                 let w_scale = WIDTH as f32 / width as f32;
                 let h_scale = HEIGHT as f32 / height as f32;
                 let image_cropped = image::imageops::crop_imm(image.as_ref(), x_pad as u32, y_pad as u32, w_pad as u32, h_pad as u32).to_image();
@@ -136,7 +143,7 @@ async fn main() -> TractResult<()> {
 
     let points_read = points.read().unwrap();
     let points: Vec<_> = points_read.iter().map(|(x, y)| Point { x: *x, y: *y }).collect();
-    let connected_components = dot2rect::connected_components(points.clone(), 3);
+    let connected_components = dot2rect::connected_components(points.clone(), NEIGHBOR_STEP);
     timer.tick();
     println!("Points to Rects");
 

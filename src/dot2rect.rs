@@ -1,6 +1,6 @@
 use std::cmp;
 
-use crate::{HEIGHT, WIDTH};
+use crate::{DETECT_AREA_EXPAND_PADDING_X, DETECT_AREA_EXPAND_PADDING_Y, HEIGHT, WIDTH};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
@@ -88,7 +88,6 @@ pub fn connected_components(points: Vec<Point>, step: i32) -> Vec<Vec<Point>> {
     result
 }
 
-const PADDING: u32 = 4;
 
 pub fn wrapped_rect(points: Vec<Point>) -> Option<Rect> {
     let (mut max_x, mut max_y) = (u32::MIN, u32::MIN);
@@ -111,10 +110,10 @@ pub fn wrapped_rect(points: Vec<Point>) -> Option<Rect> {
     if w <= 0 || h <= 0 {
         None
     } else {
-        let x = if min_x > PADDING { min_x - PADDING } else { 0 };
-        let y = if min_y > PADDING { min_y - PADDING } else { 0 };
-        let h = cmp::min(HEIGHT, h + 2 * PADDING);
-        let w = cmp::min(WIDTH, w + 2 * PADDING);
+        let x = (min_x - DETECT_AREA_EXPAND_PADDING_X).max(0);
+        let y = (min_y - DETECT_AREA_EXPAND_PADDING_Y).max(0);
+        let w = cmp::min(WIDTH, w + 2 * DETECT_AREA_EXPAND_PADDING_X);
+        let h = cmp::min(HEIGHT, h + 2 * DETECT_AREA_EXPAND_PADDING_Y);
         Some(
             Rect {
                 x,
