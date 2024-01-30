@@ -1,13 +1,18 @@
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
+use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Read};
 use std::string::String;
+#[cfg(feature = "dbg")]
+use std::sync::RwLock;
 
-use image::{GenericImage, ImageBuffer, ImageOutputFormat, Rgb, RgbImage};
+#[cfg(feature = "dbg")]
+use image::{GenericImage, ImageBuffer, Rgb};
+use image::{ImageOutputFormat, RgbImage};
 use image::io::Reader as ImageReader;
+#[cfg(feature = "dbg")]
 use imageproc::drawing::draw_filled_rect_mut;
-use imageproc::rect::Rect;
 use tract_onnx::prelude::*;
 use tract_onnx::prelude::tract_itertools::Itertools;
 use tract_onnx::prelude::tract_num_traits::abs;
@@ -21,8 +26,8 @@ mod benchmark;
 const WIDTH: u32 = 256;
 const HEIGHT: u32 = 256;
 
-
-fn main() -> TractResult<()> {
+#[tokio::main]
+async fn main() -> TractResult<()> {
     let mut timer = Timer::new();
     let image_path = "example/40a4bae6f5a3ef025778196b2d0cc708.jpeg";
     let rec_model = onnx()
@@ -39,12 +44,19 @@ fn main() -> TractResult<()> {
         .into_compact()? //todo: it will panic.
         // make the model runnable and fix its inputs and outputs
         .into_runnable()?;
+    let rec_model = Arc::new(rec_model);
     timer.tick();
     println!("model load successfully");
 
+    let _ = fs::remove_dir_all("output");
+    let _ = fs::create_dir("output");
+    timer.tick();
+    println!("Cleaned output folder!");
+
     let mut buf = String::new();
     File::open("model/label_list.txt").unwrap().read_to_string(&mut buf).expect("Unable to read label");
-    let label: Vec<_> = buf.split("\n").collect();
+    let label: Vec<String> = buf.split("\n").map(|v| v.to_string()).collect();
+    let label = Arc::new(label);
     timer.tick();
     println!("Label loaded");
 
@@ -89,30 +101,66 @@ fn main() -> TractResult<()> {
         }
         count -= 1;
     }
+
     let points: Vec<_> = x.iter().map(|&v| v).zip(y.clone()).map(|(x, y)| Point { x, y }).collect();
     let connected_components = dot2rect::connected_components(points.clone(), 3);
-    let mut output_image = ImageBuffer::new(image.width(), image.height());
-    output_image.copy_from(&image, 0, 0).expect("Failed to copy background image");
-    for component in connected_components {
-        if let Some(mut rect) = wrapped_rect(component) {
-            rect.remap(image.width(), image.height());
-            let rect_sr = Rect::at(rect.x as i32, rect.y as i32).of_size(rect.width, rect.height);
-            let fill_color = Rgb([255, 0, 0]); // 填充颜色为红色，透明度为 128
-            draw_filled_rect_mut(&mut output_image, rect_sr, fill_color);
-            let sub_image = image::imageops::crop_imm(&image, rect.x, rect.y, rect.width, rect.height).to_image();
-            let mut buf = BufWriter::new(File::create(format!("output/{}-{}.png", rect.x, rect.y)).unwrap());
-            sub_image.write_to(&mut buf, ImageOutputFormat::Png).expect("TODO: panic message");
-            rec(&rec_model, &sub_image, &label).unwrap();
-        }
-    }
-    output_image.save("render.png").expect("Failed to save output image");
     timer.tick();
-    println!("\n");
+    println!("Points to Rects");
+
+
+    #[cfg(feature = "dbg")] let mut output_image = ImageBuffer::new(image.width(), image.height());
+    #[cfg(feature = "dbg")]
+    output_image.copy_from(&image, 0, 0).expect("Failed to copy background image");
+    #[cfg(feature = "dbg")]
+        let rect = Arc::new(RwLock::new(Vec::new()));
+
+    let width = image.width();
+    let height = image.height();
+    let image = Arc::new(image);
+    let mut handlers = vec![];
+    for component in connected_components {
+        let image_cloned = image.clone();
+        let label_cloned = label.clone();
+        let rec_model_cloned = rec_model.clone();
+        #[cfg(feature = "dbg")]
+            let rect_clone = rect.clone();
+        let handler = tokio::spawn(async move {
+            if let Some(mut rect) = wrapped_rect(component) {
+                rect.remap(width, height);
+                #[cfg(feature = "dbg")]{
+                    let mut rect_mut = rect_clone.write().unwrap();
+                    rect_mut.push(rect.clone());
+                }
+                let sub_image = image::imageops::crop_imm(image_cloned.as_ref(), rect.x, rect.y, rect.width, rect.height).to_image();
+                let mut buf = BufWriter::new(File::create(format!("output/{}-{}.png", rect.x, rect.y)).unwrap());
+                sub_image.write_to(&mut buf, ImageOutputFormat::Png).expect("TODO: panic message");
+                rec(&rec_model_cloned, &sub_image, &label_cloned).unwrap();
+            }
+        });
+        handlers.push(handler);
+    }
+    for handle in handlers {
+        handle.await.unwrap();
+    }
+    timer.tick();
+    println!("Recognized");
+
+    #[cfg(feature = "dbg")]{
+        let rect_read = rect.read().unwrap();
+        for rect in rect_read.iter() {
+            let rect_sr = imageproc::rect::Rect::at(rect.x as i32, rect.y as i32).of_size(rect.width, rect.height);
+            let fill_color = Rgb([255, 0, 0]); // 填充颜色为红色
+            draw_filled_rect_mut(&mut output_image, rect_sr, fill_color);
+        }
+        output_image.save("render.png").expect("Failed to save output image");
+        timer.tick();
+        println!("Detected Area Rendered");
+    }
     timer.all();
     Ok(())
 }
 
-fn rec<F, O, M>(model: &RunnableModel<F, O, M>, image: &RgbImage, label: &Vec<&str>) -> TractResult<String>
+fn rec<F, O, M>(model: &RunnableModel<F, O, M>, image: &RgbImage, label: &Vec<String>) -> TractResult<String>
     where
         F: Fact + Clone + 'static,
         O: Debug + Display + AsRef<dyn Op> + AsMut<dyn Op> + Clone + 'static,

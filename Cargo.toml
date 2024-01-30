@@ -8,11 +8,15 @@ edition = "2021"
 [dependencies]
 image = "0"
 imageproc = "0"
-plt = { version = "0",features = ["png"] }
+plt = { version = "0", features = ["png"] }
 tract-onnx = "0"
 chrono = "0"
+tokio = { version = "1.35.1", features = ["tokio-macros", "rt", "rt-multi-thread", "macros"] }
 
 [profile.release]
 #opt-level = 'z'
 #lto = true
 #codegen-units = 1
+
+[features]
+dbg = []

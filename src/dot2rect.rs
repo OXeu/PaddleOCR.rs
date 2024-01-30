@@ -8,7 +8,7 @@ pub struct Point {
     pub(crate) y: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
