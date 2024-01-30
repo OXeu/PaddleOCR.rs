@@ -1,0 +1,18 @@
+[package]
+name = "ocr-infer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+image = "0"
+imageproc = "0"
+plt = { version = "0.4.1",features = ["png"] }
+tract-onnx = "0"
+rand = "0.8.5"
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1

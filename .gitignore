@@ -1,0 +1,7 @@
+/target
+/example
+/output
+.idea/
+*.png
+*.exe
+ocr-infer
